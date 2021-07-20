@@ -1,6 +1,6 @@
 # 1. elasticsearch
 
-![image-20210716153142983](D:/Project/gitbook/%E6%B8%A3%E6%B8%A3%E8%BF%90%E7%BB%B4%E5%8F%B2/C4=%E5%BD%92%E6%A1%A3%E8%B5%84%E6%96%99/C4.07=Elastic%20Stack/elk.assets/image-20210716153142983-1626420709740.png)
+
 
 # 2. filebeat
 
@@ -35,7 +35,7 @@ filebeat.inputs:
   enabled: true
   paths:
     - /opt/tomcat/logs/*.log
-output.elasticsearch:       # output 到 elasticsearch 
+output.elasticsearch:            # output 到 elasticsearch 
   hosts:["192.168.1.101:9200"]   # 指定 elasticsearch 的节点IP地址
 ```
 
@@ -121,9 +121,55 @@ setup.kibana:
 
 ## 2.4 减少无用的日志信息
 
+### 2.4.1 方式一：修改 fielbeat.yml 的 inputs
+
+```bash
+fielbeat.inputs:
+- type: log
+  enable: true
+  paths: /opt/tomcat/logs/*.log
+  include_lines: ['^ERR','WARN','']  # 只收集错误、警告、sshd的日志
+```
+
+### 2.4.1 方式二：修改 fielbeat.yml 的 processors
+
+```bash
+processors:
+  # 将自带的一些字段可以去除
+  # - add_host_metadata:
+  #     when.not.contains.tags: forwarded
+  # - add_cloud_metadata: ~
+  # - add_docker_metadata: ~
+  # - add_kubernetes_metadata: ~
+  # 在这里可以设置要去除的字段
+  - drop_fields:
+      # when: 可以设置去除的条件
+      #   condition
+      fields: ["log","host","input","agent","ecs"]
+      ignore_missing: false
+```
+
+### 2.4.1 方式二：修改 fielbeat.yml 的 output
+
+```bash
+output.elasticsearch:
+  hosts:["192.168.1.101:9200"]
+  
+  # 按照 json 格式输出
+  codec.json:
+    pretty: true
+    escape_html: false
+    
+  # 按照字符串格式只输出message
+  codec.format:
+    string: '%{[message]}'
+```
+
+
+
 ## 2.5 更改索引名称
 
-### 2.5.1 修改file beat
+### 2.5.1 方式一：修改file beat
 
 ```bash
 fielbeat.inputs:
@@ -135,20 +181,66 @@ output.elasticsearch:
   hosts: ["192.168.1.101:9200"]
   index: tomcat-%{agent.version}-%{yyyy.MM.dd}  # 自定义索引名称，日产1T以上，按天；日产1T一下，可按月。
   
-setup.ilm.enabled: false
+setup.ilm.enabled: false      # 6.8以上必须加上这，定义所应关联的模板mign
 setup.template:
-  name: "api-tomcat"        # 定义模板名称,索引关联的模板名称
-  pattern: "api-tomcat-*"   # 定义模板的匹配索引名称
-setup.template.overwrite: true  # 是否覆盖现有的模板
-setup.template.enabled: false   # 禁用模板加载
-setup.template.settings:   # 定义索引分片数和副本
-  index.number_of_shards: 1
-  index.number_of_replicas: 1
+  name: "api-tomcat"          # 定义模板名称,索引关联的模板名称
+  pattern: "api-tomcat-*"     # 定义模板的匹配索引名称
+  overwrite: true             # 是否覆盖现有的模板
+  enabled: false              # 禁用模板加载
+setup.template.settings:      # 定义索引分片数和副本
+  index.number_of_shards: 1   # 分片数
+  index.number_of_replicas: 1 # 副本数
 ```
 
-### 2.5.2 删除 elasticsearch 索引
+> 要使设定的模板生效，需要：
+>
+> 1. 删除 old 模板
+> 2. 删除 old 索引
+>
+> 3. 重启 filebeat
+> 4. kibaban 重新添加索引模式
 
-### 2.5.3 kibana 重新添加索引名称
+### 2.5.2 方式二：es 上修改模板
+
+使用 cerebro  或  kibana 工具直接修改模板
+
+在 “setting” 节下，添加 shards 分片数量，replicas 数量：
+
+"number_of_routing_shards": "30",
+
+"number_of_shards": "10",
+
+"number_of_replicas": "1"
+
+1. 修改 test 模板；
+2. 删除模板关联的索引；
+3. 3.删除 file beat 自行制定的分片数和副本数
+
+
+
+## 2.6 filebeat 实战-收集 tocmat 日志
+
+
+
+```bash
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /opt/tomcat/logs/*.log
+output.elasticsearch:            # output 到 elasticsearch 
+  hosts:["192.168.1.101:9200"]   # 指定 elasticsearch 的节点IP地址
+```
+
+
+
+
+
+
+
+
+
+
 
 
 
