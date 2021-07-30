@@ -1,8 +1,27 @@
 # 1. elasticsearch
 
+```bash
+rpm -ivh elasticsearch-7.8.0-x86_64.rpm
+rpm -ivh filebeat-7.8.0-x86_64.rpm
+rpm -ivh kibana-7.8.0-x86_64.rpm
+```
+
 
 
 # 2. filebeat
+
+官方文档：[https://www.elastic.co/guide/en/beats/filebeat/7.13/configuration-filebeat-options.html](https://www.elastic.co/guide/en/beats/filebeat/7.13/configuration-filebeat-options.html)
+
+```
+[root@ZJHZ-YUNMAS-API01 filebeat]# find / -name filebeat
+/etc/filebeat
+/etc/rc.d/init.d/filebeat
+/usr/share/filebeat
+/usr/share/filebeat/bin/filebeat
+/usr/bin/filebeat
+```
+
+
 
 ## 2.1 output.console 通过终端获取数据
 
@@ -206,28 +225,45 @@ setup.template.settings:      # 定义索引分片数和副本
 
 在 “setting” 节下，添加 shards 分片数量，replicas 数量：
 
+```bash
 "number_of_routing_shards": "30",
-
 "number_of_shards": "10",
-
 "number_of_replicas": "1"
+```
 
 1. 修改 test 模板；
 2. 删除模板关联的索引；
-3. 3.删除 file beat 自行制定的分片数和副本数
+3. 删除 file beat 自行制定的分片数和副本数
 
 
 
-## 2.6 filebeat 实战-收集 tocmat 日志
+## 2.6 filebeat 自定义字段等
+
+### 2.6.1 
 
 
+
+## 2.7 filebeat 实战 - 收集 tocmat 日志
+
+需求：
+
+1.tomcat 日志
+
+2.应用 日志
+
+3.json 格式
 
 ```bash
 filebeat.inputs:
 - type: log
   enabled: true
   paths:
-    - /opt/tomcat/logs/*.log
+    - /opt/tomcat/logs/*.log    # 日志路径
+  json.keys_under_root: true    # 可以让字段位于根节点，默认为false
+  json.overwrite_keys: true     # 覆盖默认的key，使用自定义json格式的key
+  json.add_error_key: true      # 将解析错误的消息记录储存在error.message字段中
+  json.message_key: message     # 用来合并多行json日志使用的，如果配置该项还需要配置multiline的设置
+  
 output.elasticsearch:            # output 到 elasticsearch 
   hosts:["192.168.1.101:9200"]   # 指定 elasticsearch 的节点IP地址
 ```
@@ -236,7 +272,26 @@ output.elasticsearch:            # output 到 elasticsearch
 
 
 
+# 3 常见问题
 
+
+
+~~~bash
+1. 找到registry文件的位置，如果没有单独配置那么文件路径为`/var/lib/filebeat/registry`，不在也没关心，可以直接find命令查找
+```
+# find / -name registry
+/var/lib/filebeat/registry
+```
+
+2. 关闭filebeat --> 删掉registry文件 --> 启动filebeat
+```
+/etc/init.d/filebeat stop &&\
+rm -r /var/lib/filebeat/registry &&\
+/etc/init.d/filebeat start
+```
+ 
+参考文档：https://mp.weixin.qq.com/s/H5QiZ10KSdUXFW5LdH79wA
+~~~
 
 
 
